@@ -1,5 +1,5 @@
 # aframe-flowermenu
-A-frame cool menu that appears/disappears when user put their controllers together! Created by JC Rueda (github.com/disketteomelette).
+A-frame cool menu that appears/disappears when user put their controllers together! Created by JC Rueda (github.com/disketteomelette). Licensed under MIT-TAL License (watch my MIT-TAL repository).
 
 ## Description
 This project leverages **A-Frame**, a framework for creating Virtual Reality (VR) and Augmented Reality (AR) experiences on the web, to implement an interactive **Augmented Reality (AR)** experience. In this case, a 3D object in the shape of a **flower** is deployed with interactions using the user's hands.
