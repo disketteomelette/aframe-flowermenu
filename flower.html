@@ -167,7 +167,7 @@
           }
 
           if (hovering !== lastHover) {
-            playSound("hover.mp3");
+            playSound("encima.mp3");
             lastHover = hovering;
           }
 
@@ -176,7 +176,7 @@
           textEl.setAttribute('value', message);
 
           if (leftPressed || rightPressed) {
-            playSound("press.mp3");
+            playSound("click.mp3");
             if (hovering) {
               const targetButton = document.getElementById(hovering);
               targetButton.setAttribute("material", { color: "#fff", opacity: 0.3 });
