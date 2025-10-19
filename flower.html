@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <!-- Metadatos y título de la página -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A-Frame Flower Menu by JC Rueda</title>
+
+  <!-- Carga de la librería A-Frame para la experiencia de realidad aumentada -->
+  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+
+  <!-- Estilos básicos para el cuerpo de la página -->
+  <style>
+    body {
+      margin: 0;
+      background: #000; /* Fondo negro */
+    }
+  </style>
+</head>
+<body>
+  <!-- Escena de A-Frame con soporte de realidad aumentada -->
+  <a-scene xr-mode-ui="enabled: true" webxr="optionalFeatures: local-floor; mode: ar" renderer="alpha: true; physicallyCorrectLights: true">
+    
+    <!-- Entidad de luz ambiental para iluminar la escena -->
+    <a-entity light="type: ambient; intensity: 1"></a-entity>
+
+    <!-- Cajas de interacción (izquierda y derecha) con opacidad para visibilidad en AR -->
+    <a-box id="leftBox" color="#29b6f6" depth="0.08" height="0.08" width="0.08" material="opacity: 0.5"></a-box>
+    <a-box id="rightBox" color="#ff7043" depth="0.08" height="0.08" width="0.08" material="opacity: 0.5"></a-box>
+
+    <!-- Cámara de la escena sin controles WASD -->
+    <a-entity camera wasd-controls="enabled:false">
+      
+      <!-- Elemento HUD que muestra la información de colisiones -->
+      <a-entity id="hud" position="0 0 -0.4" scale="0.2 0.2 0.2"
+                animation="property: scale; dir: alternate; dur: 2000; loop: true; easing: easeInOutSine; to: 0.25 0.25 0.25">
+
+        <!-- Flor animada (oculta inicialmente) -->
+        <a-entity id="flor" position="0 0 -0.3" rotation="90 0 0" visible="false">
+          
+          <!-- Anillo de la flor -->
+          <a-entity id="ring" scale="0.63 0.63 0.63" rotation="90 0 0" geometry="primitive: torus; radiusTubular: 0.03;"
+                    material="opacity: 0.78; color: #53d9ff; emissive: #00e7f2; emissiveIntensity: 0.64; metalness: 0.32; roughness: 0.24;"></a-entity>
+
+          <!-- Botones interactivos en la flor -->
+          <a-box id="button1" material="color:#e91e63; opacity:0.2" scale="0.5 0.5 0.5" position="0 0 0.6"></a-box>
+          <a-box id="button2" material="color:#ff9800; opacity:0.2" scale="0.5 0.5 0.5" position="0.57 0 0.18" rotation="0 72 0"></a-box>
+          <a-box id="button3" material="color:#4caf50; opacity:0.2" scale="0.5 0.5 0.5" position="0.35 0 -0.48" rotation="0 144 0"></a-box>
+          <a-box id="button4" material="color:#2196f3; opacity:0.2" scale="0.5 0.5 0.5" position="-0.35 0 -0.48" rotation="0 216 0"></a-box>
+          <a-box id="button5" material="color:#9c27b0; opacity:0.2" scale="0.5 0.5 0.5" position="-0.57 0 0.18" rotation="0 288 0"></a-box>
+
+          <!-- Luz adicional para los botones de la flor -->
+          <a-entity id="luz-botonera" position="0 0.4 0" light="intensity: 1.5; color: #f7edce; distance: 0.3; type: point"></a-entity>
+        </a-entity>
+
+        <!-- Texto para mostrar la información de las colisiones -->
+        <a-text id="collisionText" value="" color="#fff" align="center" width="3" scale="0.25 0.25 0.25"></a-text>
+      </a-entity>
+    </a-entity>
+  </a-scene>
+
+  <!-- Scripts -->
+  <script>
+    // Mapa para controlar el tiempo de espera entre sonidos
+    const soundCooldown = new Map();
+
+    // Función para reproducir sonidos con control de tiempo (evitar repeticiones rápidas)
+    function playSound(file, cd = 300) {
+      const now = Date.now();
+      if (!soundCooldown.has(file) || now - soundCooldown.get(file) > cd) {
+        new Audio(file).play();
+        soundCooldown.set(file, now);
+      }
+    }
+
+    // Referencias a elementos de la escena
+    const scene = document.querySelector('a-scene');
+    const leftBox = document.getElementById('leftBox');
+    const rightBox = document.getElementById('rightBox');
+    const textEl = document.getElementById('collisionText');
+    const flor = document.getElementById('flor');
+    const buttons = flor.querySelectorAll('a-box');
+
+    // Variables para manejar el estado de las manos y los botones
+    const THREEJS = AFRAME.THREE;
+    const NORMAL_SCALE = "0.5 0.5 0.5";
+    const BIG_SCALE = "0.7 0.7 0.7";
+    let handsWereColliding = false;
+    let lastHover = null;
+
+    // Función para animar la flor (aparecer o desaparecer)
+    const animateFlor = show => {
+      flor.setAttribute("animation", {
+        property: "rotation",
+        from: show ? "90 360 0" : "90 0 0",
+        to: show ? "90 0 0" : "90 360 0",
+        dur: 500,
+        easing: "easeInOutQuad"
+      });
+      flor.setAttribute("visible", true);
+      if (show) playSound("reveal.mp3");
+      else playSound("close.mp3");
+
+      flor.addEventListener("animationcomplete", function h() {
+        flor.removeEventListener("animationcomplete", h);
+        flor.removeAttribute("animation");
+        flor.setAttribute("rotation", "90 0 0");
+        if (!show) flor.setAttribute("visible", false);
+      });
+    };
+
+    // Función para alternar la visibilidad de la flor
+    const toggleFlor = () => {
+      if (!flor.hasAttribute("animation")) animateFlor(!flor.getAttribute("visible"));
+    };
+
+    // Manejo de la entrada en realidad aumentada y movimiento de las manos
+    scene.addEventListener('enter-vr', () => {
+      if (!scene.is('ar-mode')) return;
+
+      const xrSession = scene.renderer.xr.getSession();
+      xrSession.requestReferenceSpace('local-floor').then(refSpace => {
+        xrSession.requestAnimationFrame(function loop(t, frame) {
+          let leftPressed = false;
+          let rightPressed = false;
+
+          // Verificación de las entradas de los controladores
+          for (const input of xrSession.inputSources) {
+            const space = input.gripSpace || input.targetRaySpace;
+            const pose = space && frame.getPose(space, refSpace);
+
+            if (pose) {
+              const { position: p, orientation: q } = pose.transform;
+              const box = input.handedness === "left" ? leftBox : input.handedness === "right" ? rightBox : null;
+              if (box) {
+                box.object3D.position.set(p.x, p.y, p.z);
+                box.object3D.quaternion.set(q.x, q.y, q.z, q.w);
+              }
+            }
+
+            // Manejo de botones presionados
+            if (input.gamepad?.buttons?.length) {
+              const pressed = input.gamepad.buttons[0].pressed || input.gamepad.buttons[0].value > 0.5;
+              if (input.handedness === "left") leftPressed = pressed;
+              if (input.handedness === "right") rightPressed = pressed;
+            }
+          }
+
+          // Verificación de colisión entre las manos
+          let handsColliding = new THREEJS.Box3().setFromObject(leftBox.object3D)
+            .intersectsBox(new THREEJS.Box3().setFromObject(rightBox.object3D));
+          if (handsColliding && !handsWereColliding) toggleFlor();
+          handsWereColliding = handsColliding;
+
+          let message = "", hovering = null;
+
+          // Verificación de la interacción con los botones de la flor
+          if (flor.getAttribute('visible')) {
+            buttons.forEach(b => b.setAttribute("scale", NORMAL_SCALE));
+            buttons.forEach(b => {
+              const dist = leftBox.object3D.position.distanceTo(b.object3D.position);
+              if (dist < 0.4) {
+                b.setAttribute("scale", BIG_SCALE);
+                hovering = b.id;
+              }
+            });
+          }
+
+          if (hovering !== lastHover) {
+            playSound("hover.mp3");
+            lastHover = hovering;
+          }
+
+          // Actualización del texto de colisión
+          message = hovering ? `Botón ${hovering}` : "Usa las manos para interactuar";
+          textEl.setAttribute('value', message);
+
+          if (leftPressed || rightPressed) {
+            playSound("press.mp3");
+            if (hovering) {
+              const targetButton = document.getElementById(hovering);
+              targetButton.setAttribute("material", { color: "#fff", opacity: 0.3 });
+            }
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>
